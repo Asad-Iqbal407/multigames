@@ -24,8 +24,8 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Neon Snake",
-  description: "A retro-modern snake game",
+  title: "Neon Arcade",
+  description: "A retro-modern arcade game collection",
 };
 
 export default function RootLayout({

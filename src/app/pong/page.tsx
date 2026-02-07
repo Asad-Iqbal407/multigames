@@ -1,5 +1,3 @@
-"use client";
-
 import PongGame from '@/components/PongGame';
 
 export const metadata = {
