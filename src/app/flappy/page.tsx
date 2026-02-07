@@ -1,3 +1,5 @@
+"use client";
+
 import FlappyBirdGame from "../../components/FlappyBirdGame";
 
 export default function FlappyBirdPage() {

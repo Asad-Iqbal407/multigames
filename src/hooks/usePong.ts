@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { pongAudio } from '../utils/pongAudio';
 

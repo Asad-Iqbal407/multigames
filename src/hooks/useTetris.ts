@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TETROMINOES, randomTetromino, TetrominoShape } from '../utils/tetrominoes';
 import { tetrisAudio } from '../utils/tetrisAudio';
