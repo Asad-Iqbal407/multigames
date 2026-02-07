@@ -53,6 +53,21 @@ type Star = {
   a: number;
 };
 
+type Shockwave = {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  maxR: number;
+};
+
+const STAGE_PALETTES = [
+  ["#070717", "#04040a", "#000000"], // 1: Default Blue/Black
+  ["#2e0202", "#1a0000", "#000000"], // 2: Red Nebula
+  ["#1a052e", "#0a0214", "#000000"], // 3: Purple Void
+  ["#022e2e", "#001414", "#000000"], // 4: Cyan Deep
+];
+
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 const dist2 = (a: Vec2, b: Vec2) => {
@@ -67,6 +82,7 @@ const StarWarGame: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
+  const [stage, setStage] = useState(1);
   const [highScore, setHighScore] = useState(() => {
     if (typeof window === "undefined") return 0;
     const saved = localStorage.getItem("starwar-highscore");
@@ -77,6 +93,7 @@ const StarWarGame: React.FC = () => {
   const gameStateRef = useRef<GameState>("idle");
   const scoreRef = useRef(0);
   const livesRef = useRef(3);
+  const stageRef = useRef(1);
 
   const playerRef = useRef<Player>({
     x: WORLD_WIDTH / 2,
@@ -92,14 +109,19 @@ const StarWarGame: React.FC = () => {
   const nextIdRef = useRef(1);
   const lastEnemySpawnMsRef = useRef(0);
   const lastShotMsRef = useRef(0);
+  const lastBombMsRef = useRef(0);
   const lastTickMsRef = useRef<number | null>(null);
+
+  const projectilesRef = useRef<{ id: number; x: number; y: number; vy: number; isBomb: boolean; r: number }[]>([]);
+  const shockwavesRef = useRef<Shockwave[]>([]);
 
   const keysRef = useRef({
     left: false,
     right: false,
     up: false,
     down: false,
-    shoot: false
+    shoot: false,
+    bomb: false
   });
 
   const pointerTargetRef = useRef<{ active: boolean; x: number; y: number }>({
@@ -132,6 +154,9 @@ const StarWarGame: React.FC = () => {
   useEffect(() => {
     livesRef.current = lives;
   }, [lives]);
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
 
   const resetWorld = useCallback(() => {
     playerRef.current = {
@@ -141,14 +166,19 @@ const StarWarGame: React.FC = () => {
       invulnUntilMs: performance.now() + 800
     };
     bulletsRef.current = [];
+    projectilesRef.current = [];
+    shockwavesRef.current = [];
     enemiesRef.current = [];
     particlesRef.current = [];
     scoreRef.current = 0;
     livesRef.current = 3;
+    stageRef.current = 1;
     setScore(0);
     setLives(3);
+    setStage(1);
     lastEnemySpawnMsRef.current = performance.now();
     lastShotMsRef.current = 0;
+    lastBombMsRef.current = 0;
     lastTickMsRef.current = null;
   }, []);
 
@@ -169,8 +199,27 @@ const StarWarGame: React.FC = () => {
     setGameState("playing");
   }, [resetWorld]);
 
-  const fire = useCallback((nowMs: number) => {
+  const fire = useCallback((nowMs: number, isBomb: boolean = false) => {
     if (gameStateRef.current !== "playing") return;
+    
+    if (isBomb) {
+      const bombCooldown = 2000;
+      if (nowMs - lastBombMsRef.current < bombCooldown) return;
+      lastBombMsRef.current = nowMs;
+
+      const id = nextIdRef.current++;
+      const p = playerRef.current;
+      projectilesRef.current.push({
+        id,
+        x: p.x,
+        y: p.y - 20,
+        vy: -300,
+        isBomb: true,
+        r: 12
+      });
+      return;
+    }
+
     const cooldownMs = 140;
     if (nowMs - lastShotMsRef.current < cooldownMs) return;
     lastShotMsRef.current = nowMs;
@@ -232,6 +281,7 @@ const StarWarGame: React.FC = () => {
       if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") keysRef.current.up = true;
       if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") keysRef.current.down = true;
       if (e.key === " " || e.key === "Spacebar") keysRef.current.shoot = true;
+      if (e.key === "f" || e.key === "F") keysRef.current.bomb = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keysRef.current.left = false;
@@ -239,6 +289,7 @@ const StarWarGame: React.FC = () => {
       if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") keysRef.current.up = false;
       if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") keysRef.current.down = false;
       if (e.key === " " || e.key === "Spacebar") keysRef.current.shoot = false;
+      if (e.key === "f" || e.key === "F") keysRef.current.bomb = false;
     };
 
     window.addEventListener("keydown", onKeyDown, { passive: false });
@@ -276,10 +327,10 @@ const StarWarGame: React.FC = () => {
 
     const spawnEnemy = (nowMs: number) => {
       const enemiesInView = enemiesRef.current.filter(e => e.y > -80 && e.y < WORLD_HEIGHT + 80).length;
-      const maxEnemies = 7;
+      const maxEnemies = 7 + stageRef.current * 2;
       if (enemiesInView >= maxEnemies) return;
 
-      const baseEvery = Math.max(380, 920 - scoreRef.current * 3);
+      const baseEvery = Math.max(250, 920 - scoreRef.current * 3 - stageRef.current * 100);
       if (nowMs - lastEnemySpawnMsRef.current < baseEvery) return;
       lastEnemySpawnMsRef.current = nowMs;
 
@@ -287,13 +338,13 @@ const StarWarGame: React.FC = () => {
       const r = 16 + Math.random() * 12;
       const x = r + Math.random() * (WORLD_WIDTH - r * 2);
       const y = -r - 20;
-      const vy = 90 + Math.random() * 150 + Math.min(220, scoreRef.current * 0.6);
+      const vy = 90 + Math.random() * 150 + Math.min(220, scoreRef.current * 0.6) + stageRef.current * 20;
       const palette = ["#ff3b3b", "#ff7a18", "#ff2fd6", "#a855f7"];
       const color = palette[Math.floor(Math.random() * palette.length)];
 
       enemiesRef.current = [
         ...enemiesRef.current,
-        { id, x, y, vy, r, hp: 1, color }
+        { id, x, y, vy, r, hp: 1 + Math.floor(stageRef.current / 3), color }
       ];
     };
 
@@ -335,6 +386,7 @@ const StarWarGame: React.FC = () => {
       if (gameStateRef.current !== "playing") return;
 
       if (keysRef.current.shoot) fire(nowMs);
+      if (keysRef.current.bomb) fire(nowMs, true);
 
       spawnEnemy(nowMs);
 
@@ -361,6 +413,14 @@ const StarWarGame: React.FC = () => {
         .map(b => ({ ...b, y: b.y + b.vy * dt }))
         .filter(b => b.y > -30);
 
+      projectilesRef.current = projectilesRef.current
+        .map(p => ({ ...p, y: p.y + p.vy * dt }))
+        .filter(p => p.y > -50);
+
+      shockwavesRef.current = shockwavesRef.current
+        .map(s => ({ ...s, r: s.r + (s.maxR - s.r) * 0.1 }))
+        .filter(s => s.r < s.maxR - 2);
+
       enemiesRef.current = enemiesRef.current
         .map(en => ({ ...en, y: en.y + en.vy * dt }))
         .filter(en => en.y < WORLD_HEIGHT + 120);
@@ -370,28 +430,85 @@ const StarWarGame: React.FC = () => {
         .filter(pt => pt.life > 0);
 
       const bullets = bulletsRef.current;
+      const projectiles = projectilesRef.current;
       const enemies = enemiesRef.current;
+      const shockwaves = shockwavesRef.current;
 
       const deadBullets = new Set<number>();
+      const deadProjectiles = new Set<number>();
       const deadEnemies = new Set<number>();
 
+      // Bullet vs Enemy
       for (const b of bullets) {
         for (const en of enemies) {
           if (deadEnemies.has(en.id)) continue;
           const r = en.r + 3;
           if (dist2({ x: b.x, y: b.y }, { x: en.x, y: en.y }) <= r * r) {
             deadBullets.add(b.id);
-            deadEnemies.add(en.id);
-            explode(en.x, en.y, en.color);
-            scoreRef.current += 10;
-            setScore(scoreRef.current);
+            en.hp -= 1;
+            if (en.hp <= 0) {
+              deadEnemies.add(en.id);
+              explode(en.x, en.y, en.color);
+              scoreRef.current += 10;
+              setScore(scoreRef.current);
+            }
             break;
           }
         }
       }
 
+      // Projectile (Bomb) vs Enemy
+      for (const p of projectiles) {
+        for (const en of enemies) {
+          if (deadEnemies.has(en.id)) continue;
+          const r = en.r + p.r;
+          if (dist2({ x: p.x, y: p.y }, { x: en.x, y: en.y }) <= r * r) {
+            deadProjectiles.add(p.id);
+            // Create shockwave
+            shockwavesRef.current.push({
+              id: nextIdRef.current++,
+              x: p.x,
+              y: p.y,
+              r: 10,
+              maxR: 120
+            });
+            explode(p.x, p.y, "#ff7a18");
+            break;
+          }
+        }
+      }
+
+      // Shockwave vs Enemy
+      for (const s of shockwaves) {
+        for (const en of enemies) {
+          if (deadEnemies.has(en.id)) continue;
+          const d2 = dist2({ x: s.x, y: s.y }, { x: en.x, y: en.y });
+          const combinedR = s.r + en.r;
+          if (d2 <= combinedR * combinedR) {
+            deadEnemies.add(en.id);
+            explode(en.x, en.y, en.color);
+            scoreRef.current += 15;
+            setScore(scoreRef.current);
+          }
+        }
+      }
+
       if (deadBullets.size) bulletsRef.current = bullets.filter(b => !deadBullets.has(b.id));
+      if (deadProjectiles.size) projectilesRef.current = projectiles.filter(p => !deadProjectiles.has(p.id));
       if (deadEnemies.size) enemiesRef.current = enemies.filter(e => !deadEnemies.has(e.id));
+
+      // Stage Progression
+      const nextStageThreshold = stageRef.current * 500;
+      if (scoreRef.current >= nextStageThreshold) {
+        stageRef.current += 1;
+        setStage(stageRef.current);
+        // Bonus for stage clear
+        const bonus = 100 * stageRef.current;
+        scoreRef.current += bonus;
+        setScore(scoreRef.current);
+        // Temporary invulnerability on stage clear
+        playerRef.current.invulnUntilMs = performance.now() + 1500;
+      }
 
       const invuln = nowPerf < p.invulnUntilMs;
       if (!invuln) {
@@ -418,9 +535,10 @@ const StarWarGame: React.FC = () => {
       ctx.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
       const bg = ctx.createLinearGradient(0, 0, 0, WORLD_HEIGHT);
-      bg.addColorStop(0, "#070717");
-      bg.addColorStop(0.6, "#04040a");
-      bg.addColorStop(1, "#000000");
+      const palette = STAGE_PALETTES[(stageRef.current - 1) % STAGE_PALETTES.length];
+      bg.addColorStop(0, palette[0]);
+      bg.addColorStop(0.6, palette[1]);
+      bg.addColorStop(1, palette[2]);
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -467,6 +585,36 @@ const StarWarGame: React.FC = () => {
         ctx.moveTo(b.x, b.y);
         ctx.lineTo(b.x, b.y + 14);
         ctx.stroke();
+      }
+      ctx.restore();
+
+      // Draw Bombs
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ff7a18";
+      ctx.fillStyle = "#ff7a18";
+      for (const p of projectilesRef.current) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Draw Shockwaves
+      ctx.save();
+      for (const s of shockwavesRef.current) {
+        const opacity = 1 - (s.r / s.maxR);
+        ctx.strokeStyle = `rgba(255, 122, 24, ${opacity})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.2})`;
+        ctx.fill();
       }
       ctx.restore();
 
@@ -535,123 +683,178 @@ const StarWarGame: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4 font-orbitron text-white">
-      <div className="mb-4 text-center">
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-purple-400 to-pink-500 drop-shadow-[0_0_18px_rgba(34,211,238,0.25)]">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#050505] p-4 font-orbitron text-white overflow-hidden">
+      {/* Decorative Arcade Header */}
+      <div className="mb-8 text-center animate-pulse">
+        <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 via-purple-500 to-pink-600 filter drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]">
           STAR WAR
         </h1>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-zinc-200 text-sm md:text-base">
-          <p>SCORE: {score}</p>
-          <p>LIVES: {lives}</p>
-          <p>BEST: {highScore}</p>
+        <div className="mt-4 flex items-center justify-center gap-6">
+          <div className="h-[2px] w-12 bg-gradient-to-r from-transparent to-cyan-500" />
+          <span className="text-[10px] font-press-start tracking-[0.2em] text-cyan-400/80 uppercase">Elite Squadron</span>
+          <div className="h-[2px] w-12 bg-gradient-to-l from-transparent to-pink-500" />
         </div>
       </div>
 
-      <div className="relative">
-        <canvas
-          ref={canvasRef}
-          className="border border-zinc-700/70 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.65)] touch-none w-auto h-auto max-w-[min(96vw,640px)] max-h-[70vh] aspect-[420/620] bg-black select-none"
-          onPointerDown={handleCanvasPointerDown}
-          onPointerMove={handleCanvasPointerMove}
-          onPointerUp={handleCanvasPointerUp}
-          onPointerCancel={handleCanvasPointerUp}
-        />
+      <div className="relative group">
+        {/* Arcade Cabinet Frame */}
+        <div className="absolute -inset-4 bg-gradient-to-b from-zinc-800 to-zinc-950 rounded-[2rem] border-2 border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.8),inset_0_0_20px_rgba(255,255,255,0.05)]" />
+        <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 rounded-[1.5rem] blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+        
+        {/* Game Stats Bar */}
+        <div className="absolute -top-12 left-4 right-4 flex justify-between items-end px-2">
+          <div className="flex flex-col">
+            <span className="text-[8px] font-press-start text-zinc-500 mb-1">CURRENT STAGE</span>
+            <span className="text-xl font-black text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]">0{stage}</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-[8px] font-press-start text-zinc-500 mb-1">SCORE</span>
+            <span className="text-2xl font-black text-white tabular-nums">{score.toLocaleString()}</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[8px] font-press-start text-zinc-500 mb-1">HI-SCORE</span>
+            <span className="text-xl font-black text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">{highScore.toLocaleString()}</span>
+          </div>
+        </div>
 
+        <div className="relative z-10 p-1 bg-zinc-900 rounded-2xl shadow-inner border border-white/10">
+          <canvas
+            ref={canvasRef}
+            className="rounded-xl shadow-2xl touch-none w-auto h-auto max-w-[min(96vw,420px)] max-h-[70vh] aspect-[420/620] bg-black select-none"
+            onPointerDown={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={handleCanvasPointerUp}
+            onPointerCancel={handleCanvasPointerUp}
+          />
+
+          {/* Lives Display inside the frame */}
+          <div className="absolute bottom-4 left-4 flex gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div 
+                key={i} 
+                className={`w-3 h-3 rounded-full border ${i < lives ? 'bg-cyan-400 border-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'bg-transparent border-zinc-700'}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Overlays */}
         {gameState === "idle" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm rounded-xl">
-            <button
-              onClick={startGame}
-              className="px-10 py-4 bg-zinc-100 text-black font-black text-xl rounded-full hover:bg-white transition-all hover:scale-105 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-              type="button"
-            >
-              START
-            </button>
-            <p className="mt-4 text-zinc-300/80 text-xs tracking-wide">
-              WASD / ARROWS MOVE · SPACE SHOOT · TAP/DRAG TO MOVE + SHOOT
-            </p>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md rounded-2xl border border-white/5">
+            <div className="mb-12 text-center">
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center animate-bounce">
+                <span className="text-4xl">🚀</span>
+              </div>
+              <h2 className="text-3xl font-black text-white mb-2 tracking-widest">READY PILOT?</h2>
+              <p className="text-cyan-400/60 text-[10px] font-press-start">MISSION: SECTOR {stage}</p>
+            </div>
+
+            <div className="flex flex-col gap-4 w-full max-w-[240px]">
+              <button
+                onClick={startGame}
+                className="group relative px-8 py-4 bg-white text-black font-black text-xl rounded-xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                type="button"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-500 opacity-0 group-hover:opacity-10 transition-opacity" />
+                LAUNCH
+              </button>
+              
+              <Link
+                href="/"
+                className="px-8 py-3 bg-zinc-900 border border-white/10 text-zinc-400 font-bold text-sm rounded-xl hover:bg-zinc-800 hover:text-white transition-all text-center flex items-center justify-center gap-2"
+              >
+                <span>🏠</span> EXIT TO HOME
+              </Link>
+            </div>
+
+            <div className="absolute bottom-10 left-0 right-0 text-center">
+              <p className="text-[8px] font-press-start text-zinc-500 leading-relaxed uppercase tracking-tighter">
+                WASD TO MOVE • SPACE TO FIRE • F FOR BOMB
+              </p>
+            </div>
           </div>
         )}
 
         {gameState === "gameover" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl">
-            <h2 className="text-5xl font-black text-red-400 mb-3">GAME OVER</h2>
-            <p className="text-xl text-zinc-200 mb-8">FINAL SCORE: {score}</p>
-            <button
-              onClick={startGame}
-              className="px-10 py-4 bg-zinc-100 text-black font-black text-xl rounded-full hover:bg-white transition-all hover:scale-105 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-              type="button"
-            >
-              RETRY
-            </button>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl rounded-2xl border border-red-500/20">
+            <div className="mb-8 text-center">
+              <div className="text-6xl mb-4 animate-bounce">💥</div>
+              <h2 className="text-5xl font-black text-red-500 mb-2 tracking-tighter drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]">MISSION FAILED</h2>
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <div className="px-3 py-1 bg-zinc-900 rounded-lg border border-white/5">
+                  <span className="text-[8px] font-press-start text-zinc-500 block mb-1">SCORE</span>
+                  <span className="text-xl font-black text-white">{score}</span>
+                </div>
+                <div className="px-3 py-1 bg-zinc-900 rounded-lg border border-white/5">
+                  <span className="text-[8px] font-press-start text-zinc-500 block mb-1">BEST</span>
+                  <span className="text-xl font-black text-pink-500">{highScore}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 w-full max-w-[240px]">
+              <button
+                onClick={startGame}
+                className="group relative px-8 py-4 bg-red-600 text-white font-black text-xl rounded-xl overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(220,38,38,0.4)]"
+                type="button"
+              >
+                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity" />
+                REDEPLOY
+              </button>
+              
+              <Link
+                href="/"
+                className="px-8 py-3 bg-zinc-900 border border-white/10 text-zinc-400 font-bold text-sm rounded-xl hover:bg-zinc-800 hover:text-white transition-all text-center flex items-center justify-center gap-2"
+              >
+                <span>🏠</span> EXIT TO HOME
+              </Link>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-2 md:hidden w-full max-w-[320px]">
+      {/* Mobile Controls Enhancement */}
+      <div className="mt-12 grid grid-cols-4 gap-3 md:hidden w-full max-w-[420px] px-4">
         <div className="col-start-2">
-          <button
-            className="w-full aspect-square bg-zinc-900/60 border border-zinc-700 rounded-xl text-zinc-100 active:bg-zinc-100 active:text-black transition-colors flex items-center justify-center font-black text-xs tracking-wide"
-            onPointerDown={() => setHeld("up", true)}
-            onPointerUp={() => setHeld("up", false)}
-            onPointerCancel={() => setHeld("up", false)}
-            type="button"
-          >
-            UP
-          </button>
+          <ControlButton label="UP" onDown={() => setHeld("up", true)} onUp={() => setHeld("up", false)} color="zinc" />
         </div>
         <div className="col-start-1 row-start-2">
-          <button
-            className="w-full aspect-square bg-zinc-900/60 border border-zinc-700 rounded-xl text-zinc-100 active:bg-zinc-100 active:text-black transition-colors flex items-center justify-center font-black text-xs tracking-wide"
-            onPointerDown={() => setHeld("left", true)}
-            onPointerUp={() => setHeld("left", false)}
-            onPointerCancel={() => setHeld("left", false)}
-            type="button"
-          >
-            LEFT
-          </button>
+          <ControlButton label="LEFT" onDown={() => setHeld("left", true)} onUp={() => setHeld("left", false)} color="zinc" />
         </div>
         <div className="col-start-2 row-start-2">
-          <button
-            className="w-full aspect-square bg-red-950/60 border border-red-700 rounded-xl text-red-200 active:bg-red-400 active:text-black transition-colors flex items-center justify-center font-black text-xs tracking-wide"
-            onPointerDown={() => setHeld("shoot", true)}
-            onPointerUp={() => setHeld("shoot", false)}
-            onPointerCancel={() => setHeld("shoot", false)}
-            type="button"
-          >
-            FIRE
-          </button>
+          <ControlButton label="FIRE" onDown={() => setHeld("shoot", true)} onUp={() => setHeld("shoot", false)} color="red" />
         </div>
         <div className="col-start-3 row-start-2">
-          <button
-            className="w-full aspect-square bg-zinc-900/60 border border-zinc-700 rounded-xl text-zinc-100 active:bg-zinc-100 active:text-black transition-colors flex items-center justify-center font-black text-xs tracking-wide"
-            onPointerDown={() => setHeld("right", true)}
-            onPointerUp={() => setHeld("right", false)}
-            onPointerCancel={() => setHeld("right", false)}
-            type="button"
-          >
-            RIGHT
-          </button>
+          <ControlButton label="RIGHT" onDown={() => setHeld("right", true)} onUp={() => setHeld("right", false)} color="zinc" />
+        </div>
+        <div className="col-start-4 row-start-2">
+          <ControlButton label="BOMB" onDown={() => setHeld("bomb", true)} onUp={() => setHeld("bomb", false)} color="orange" />
         </div>
         <div className="col-start-2 row-start-3">
-          <button
-            className="w-full aspect-square bg-zinc-900/60 border border-zinc-700 rounded-xl text-zinc-100 active:bg-zinc-100 active:text-black transition-colors flex items-center justify-center font-black text-xs tracking-wide"
-            onPointerDown={() => setHeld("down", true)}
-            onPointerUp={() => setHeld("down", false)}
-            onPointerCancel={() => setHeld("down", false)}
-            type="button"
-          >
-            DOWN
-          </button>
+          <ControlButton label="DOWN" onDown={() => setHeld("down", true)} onUp={() => setHeld("down", false)} color="zinc" />
         </div>
       </div>
-
-      <Link
-        href="/"
-        className="mt-8 text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-2 font-press-start text-xs"
-      >
-        ← BACK TO ARCADE
-      </Link>
     </div>
+  );
+};
+
+const ControlButton: React.FC<{ label: string; onDown: () => void; onUp: () => void; color: 'zinc' | 'red' | 'orange' }> = ({ label, onDown, onUp, color }) => {
+  const colors = {
+    zinc: "bg-zinc-800/80 border-zinc-700 text-zinc-400 active:bg-zinc-100 active:text-black",
+    red: "bg-red-900/60 border-red-700 text-red-400 active:bg-red-500 active:text-white shadow-[0_0_15px_rgba(239,68,68,0.3)]",
+    orange: "bg-orange-900/60 border-orange-700 text-orange-400 active:bg-orange-500 active:text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+  };
+
+  return (
+    <button
+      className={`w-full aspect-square border-2 rounded-2xl transition-all flex items-center justify-center font-black text-[10px] tracking-widest uppercase ${colors[color]}`}
+      onPointerDown={onDown}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      type="button"
+    >
+      {label}
+    </button>
   );
 };
 

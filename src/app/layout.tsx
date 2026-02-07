@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron, Press_Start_2P } from "next/font/google";
 import "./globals.css";
+import ArcadeNav from "@/components/ArcadeNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,7 +25,7 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "Neon Arcade",
+  title: "Pixel Arcade",
   description: "A retro-modern arcade game collection",
 };
 
@@ -36,8 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="overflow-x-hidden">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${pressStart2P.variable} antialiased bg-black overflow-x-hidden selection:bg-cyan-500/30`}
+        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${pressStart2P.variable} antialiased bg-black overflow-x-hidden selection:bg-white/20`}
       >
+        <ArcadeNav />
         {children}
       </body>
     </html>
