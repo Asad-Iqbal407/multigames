@@ -115,7 +115,7 @@ const PongGame = () => {
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          className="bg-black block w-[min(92vw,800px)] h-auto"
+          className="bg-black block max-w-[min(92vw,800px)] max-h-[70vh] w-auto h-auto"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}

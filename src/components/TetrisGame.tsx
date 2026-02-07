@@ -192,7 +192,7 @@ const TetrisGame: React.FC = () => {
               ref={canvasRef}
               width={STAGE_WIDTH * BLOCK_SIZE}
               height={STAGE_HEIGHT * BLOCK_SIZE}
-              className="bg-black/90 border border-zinc-800 rounded-sm shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] block w-[min(92vw,360px)] h-auto"
+              className="bg-black/90 border border-zinc-800 rounded-sm shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] block max-w-[min(92vw,360px)] max-h-[70vh] w-auto h-auto"
               onPointerDown={handleTouchStart}
               onPointerMove={handleTouchMove}
               onPointerUp={handleTouchEnd}

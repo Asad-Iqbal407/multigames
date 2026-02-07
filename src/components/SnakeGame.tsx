@@ -494,7 +494,7 @@ const SnakeGame: React.FC = () => {
             ref={canvasRef}
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
-            className="block max-w-full w-[min(92vw,400px)] h-auto"
+            className="block max-w-[min(92vw,400px)] max-h-[70vh] w-auto h-auto"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

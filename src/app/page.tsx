@@ -23,7 +23,7 @@ export default function Home() {
         </div>
 
         {/* Game Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full mt-8 px-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 w-full mt-8 px-4">
           
           {/* Snake Card */}
           <Link href="/snake" className="group relative">
@@ -113,6 +113,48 @@ export default function Home() {
               </div>
               
               <div className="mt-auto w-full text-center py-2 bg-cyan-600/20 text-cyan-300 rounded border border-cyan-500/50 text-[10px] font-press-start group-hover:bg-cyan-500 group-hover:text-black transition-colors">
+                PLAY
+              </div>
+            </div>
+          </Link>
+
+          {/* Car Racing Card */}
+          <Link href="/car-racing" className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-700 rounded-2xl blur opacity-20 group-hover:opacity-60 transition-opacity duration-500" />
+            <div className="relative bg-zinc-900/90 border-2 border-blue-500/30 group-hover:border-blue-400 rounded-2xl p-6 flex flex-col items-center gap-6 transition-all duration-300 transform group-hover:-translate-y-2 group-hover:scale-105 overflow-hidden h-full">
+               <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+
+              <div className="w-20 h-20 rounded-full bg-blue-900/50 flex items-center justify-center border-4 border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.4)] group-hover:shadow-[0_0_50px_rgba(59,130,246,0.6)] transition-all">
+                <span className="text-4xl">🏎️</span>
+              </div>
+              
+              <div className="text-center z-10 flex-grow">
+                <h2 className="text-xl font-bold text-blue-400 mb-2 font-press-start">RACING</h2>
+                <p className="text-zinc-400 text-[10px] leading-relaxed">High-speed neon racing. Dodge the traffic!</p>
+              </div>
+              
+              <div className="mt-auto w-full text-center py-2 bg-blue-600/20 text-blue-300 rounded border border-blue-500/50 text-[10px] font-press-start group-hover:bg-blue-500 group-hover:text-black transition-colors">
+                PLAY
+              </div>
+            </div>
+          </Link>
+
+          {/* Star War Card */}
+          <Link href="/star-war" className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-60 transition-opacity duration-500" />
+            <div className="relative bg-zinc-900/90 border-2 border-fuchsia-500/30 group-hover:border-cyan-300 rounded-2xl p-6 flex flex-col items-center gap-6 transition-all duration-300 transform group-hover:-translate-y-2 group-hover:scale-105 overflow-hidden h-full">
+               <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+
+              <div className="w-20 h-20 rounded-full bg-fuchsia-900/40 flex items-center justify-center border-4 border-fuchsia-500/40 shadow-[0_0_30px_rgba(217,70,239,0.35)] group-hover:shadow-[0_0_55px_rgba(34,211,238,0.55)] transition-all">
+                <span className="text-4xl">🚀</span>
+              </div>
+              
+              <div className="text-center z-10 flex-grow">
+                <h2 className="text-xl font-bold text-fuchsia-300 mb-2 font-press-start">STAR WAR</h2>
+                <p className="text-zinc-400 text-[10px] leading-relaxed">Shoot enemies and survive in neon space.</p>
+              </div>
+              
+              <div className="mt-auto w-full text-center py-2 bg-fuchsia-600/20 text-fuchsia-200 rounded border border-fuchsia-500/40 text-[10px] font-press-start group-hover:bg-cyan-300 group-hover:text-black transition-colors">
                 PLAY
               </div>
             </div>
