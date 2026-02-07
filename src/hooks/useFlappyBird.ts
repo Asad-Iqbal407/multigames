@@ -23,7 +23,12 @@ export const useFlappyBird = (canvasWidth: number, canvasHeight: number) => {
   const [birdY, setBirdY] = useState(canvasHeight / 2);
   const [pipes, setPipes] = useState<Pipe[]>([]);
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
+  const [highScore, setHighScore] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const saved = localStorage.getItem('flappyHighScore');
+    const parsed = saved ? parseInt(saved, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
   const [isGameActive, setIsGameActive] = useState(false);
   const [isGameOver, setIsGameOver] = useState(false);
   const [birdRotation, setBirdRotation] = useState(0);
@@ -35,34 +40,10 @@ export const useFlappyBird = (canvasWidth: number, canvasHeight: number) => {
   const lastPipeTimeRef = useRef<number>(0);
   const isGameActiveRef = useRef(false);
 
-  // Load high score
   useEffect(() => {
-    const saved = localStorage.getItem('flappyHighScore');
-    if (saved) setHighScore(parseInt(saved));
-  }, []);
-
-  // Save high score
-  useEffect(() => {
-    if (score > highScore) {
-      setHighScore(score);
-      localStorage.setItem('flappyHighScore', score.toString());
-    }
-  }, [score, highScore]);
-
-  const spawnPipe = useCallback(() => {
-    const minHeight = 50;
-    const maxHeight = canvasHeight - PIPE_GAP - minHeight;
-    const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-    
-    const newPipe = {
-      x: canvasWidth,
-      topHeight,
-      passed: false
-    };
-    
-    pipesRef.current.push(newPipe);
-    setPipes([...pipesRef.current]);
-  }, [canvasHeight, canvasWidth]);
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('flappyHighScore', highScore.toString());
+  }, [highScore]);
 
   const startGame = useCallback(() => {
     birdYRef.current = canvasHeight / 2;
@@ -117,7 +98,11 @@ export const useFlappyBird = (canvasWidth: number, canvasHeight: number) => {
         newPipes.forEach(pipe => {
           if (!pipe.passed && pipe.x + PIPE_WIDTH < 50) { // 50 is bird X
             pipe.passed = true;
-            setScore(s => s + 1);
+            setScore(s => {
+              const next = s + 1;
+              setHighScore(h => (next > h ? next : h));
+              return next;
+            });
             flappyAudio.playScore();
           }
         });

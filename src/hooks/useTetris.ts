@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { TETROMINOES, randomTetromino, TetrominoShape } from '../utils/tetrominoes';
 import { tetrisAudio } from '../utils/tetrisAudio';
 
@@ -9,6 +9,10 @@ export const STAGE_HEIGHT = 20;
 
 type Cell = [string | number, string]; // [type, state] e.g. [0, 'clear'] or ['J', 'merged']
 export type Stage = Cell[][];
+type Player = {
+  pos: { x: number; y: number };
+  tetromino: TetrominoShape;
+};
 
 const createStage = () =>
   Array.from(Array(STAGE_HEIGHT), () =>
@@ -16,7 +20,7 @@ const createStage = () =>
   );
 
 const checkCollision = (
-  player: any,
+  player: Player,
   stage: Stage,
   { x: moveX, y: moveY }: { x: number; y: number }
 ) => {
@@ -43,7 +47,7 @@ const checkCollision = (
 };
 
 export const useTetris = () => {
-  const [stage, setStage] = useState<Stage>(createStage());
+  const [mergedStage, setMergedStage] = useState<Stage>(createStage());
   const [dropTime, setDropTime] = useState<number | null>(null);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
@@ -55,13 +59,28 @@ export const useTetris = () => {
   const [player, setPlayer] = useState({
     pos: { x: 0, y: 0 },
     tetromino: TETROMINOES[0].shape as TetrominoShape,
-    collided: false,
   });
   
   const [nextPiece, setNextPiece] = useState(randomTetromino());
 
+  const stage = useMemo(() => {
+    const nextStage = mergedStage.map(row => row.map(cell => cell)) as Stage;
+    player.tetromino.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          const stageY = y + player.pos.y;
+          const stageX = x + player.pos.x;
+          if (nextStage[stageY] && nextStage[stageY][stageX]) {
+            nextStage[stageY][stageX] = [value, 'clear'];
+          }
+        }
+      });
+    });
+    return nextStage;
+  }, [mergedStage, player]);
+
   const movePlayer = (dir: number) => {
-    if (!checkCollision(player, stage, { x: dir, y: 0 })) {
+    if (!checkCollision(player, mergedStage, { x: dir, y: 0 })) {
       setPlayer(prev => ({
         ...prev,
         pos: { x: prev.pos.x + dir, y: prev.pos.y }
@@ -71,7 +90,7 @@ export const useTetris = () => {
 
   const startGame = useCallback(() => {
     // Reset everything
-    setStage(createStage());
+    setMergedStage(createStage());
     setDropTime(1000);
     setGameOver(false);
     setScore(0);
@@ -84,7 +103,6 @@ export const useTetris = () => {
     setPlayer({
       pos: { x: STAGE_WIDTH / 2 - 2, y: 0 },
       tetromino: newTetromino.shape,
-      collided: false,
     });
     setNextPiece(randomTetromino());
     
@@ -92,12 +110,34 @@ export const useTetris = () => {
     tetrisAudio.startBGM();
   }, []);
 
-  const resetGame = () => {
-    setGameOver(true);
-    setDropTime(null);
-    setIsGameActive(false);
-    tetrisAudio.stopBGM();
-    tetrisAudio.playGameOver();
+  const sweepRows = (inputStage: Stage) => {
+    let clearedRows = 0;
+    const sweptStage = inputStage.reduce((ack, row) => {
+      if (row.findIndex(cell => cell[0] === 0) === -1) {
+        clearedRows += 1;
+        ack.unshift(new Array(inputStage[0].length).fill([0, 'clear']));
+        return ack;
+      }
+      ack.push(row);
+      return ack;
+    }, [] as Stage);
+    return { sweptStage, clearedRows };
+  };
+
+  const mergePlayerIntoStage = (inputStage: Stage, currentPlayer: Player) => {
+    const nextStage = inputStage.map(row => row.map(cell => cell)) as Stage;
+    currentPlayer.tetromino.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          const stageY = y + currentPlayer.pos.y;
+          const stageX = x + currentPlayer.pos.x;
+          if (nextStage[stageY] && nextStage[stageY][stageX]) {
+            nextStage[stageY][stageX] = [value, 'merged'];
+          }
+        }
+      });
+    });
+    return nextStage;
   };
 
   const drop = () => {
@@ -108,11 +148,10 @@ export const useTetris = () => {
       setDropTime(1000 / (level + 1) + 200);
     }
 
-    if (!checkCollision(player, stage, { x: 0, y: 1 })) {
+    if (!checkCollision(player, mergedStage, { x: 0, y: 1 })) {
       setPlayer(prev => ({
         ...prev,
-        pos: { x: prev.pos.x, y: prev.pos.y + 1 },
-        collided: false,
+        pos: { x: prev.pos.x, y: prev.pos.y + 1 }
       }));
     } else {
       // Game Over
@@ -122,8 +161,25 @@ export const useTetris = () => {
         setIsGameActive(false);
         tetrisAudio.stopBGM();
         tetrisAudio.playGameOver();
+        return;
       }
-      setPlayer(prev => ({ ...prev, collided: true }));
+
+      const merged = mergePlayerIntoStage(mergedStage, player);
+      const { sweptStage, clearedRows } = sweepRows(merged);
+      setMergedStage(sweptStage);
+
+      if (clearedRows > 0) {
+        setRows(prev => prev + clearedRows);
+        setScore(prev => prev + (clearedRows * 10 * (level + 1)));
+        if (clearedRows >= 4) tetrisAudio.playTetris();
+        else tetrisAudio.playLineClear();
+      }
+
+      setPlayer({
+        pos: { x: STAGE_WIDTH / 2 - 2, y: 0 },
+        tetromino: nextPiece.shape,
+      });
+      setNextPiece(randomTetromino());
       tetrisAudio.playDrop();
     }
   };
@@ -153,8 +209,10 @@ export const useTetris = () => {
   };
 
   const playerRotate = (stage: Stage, dir: number) => {
-    const clonedPlayer = JSON.parse(JSON.stringify(player));
-    clonedPlayer.tetromino = rotate(clonedPlayer.tetromino, dir);
+    const clonedPlayer: Player = {
+      pos: { x: player.pos.x, y: player.pos.y },
+      tetromino: rotate(player.tetromino, dir),
+    };
 
     const pos = clonedPlayer.pos.x;
     let offset = 1;
@@ -171,7 +229,8 @@ export const useTetris = () => {
     tetrisAudio.playRotate();
   };
 
-  const move = ({ keyCode, preventDefault, key }: KeyboardEvent) => {
+  const move = (e: KeyboardEvent) => {
+    const { keyCode, key } = e;
     if (!gameOver && !isPaused && isGameActive) {
       if (keyCode === 37) { // Left
         movePlayer(-1);
@@ -180,7 +239,7 @@ export const useTetris = () => {
       } else if (keyCode === 40) { // Down
         dropPlayer();
       } else if (keyCode === 38) { // Up (Rotate)
-        playerRotate(stage, 1);
+        playerRotate(mergedStage, 1);
       } else if (key === 'p' || key === 'P') {
         setIsPaused(prev => !prev);
       }
@@ -190,70 +249,6 @@ export const useTetris = () => {
   useInterval(() => {
     if (!isPaused) drop();
   }, dropTime);
-
-  // Update Stage
-  useEffect(() => {
-    const sweepRows = (newStage: Stage) => {
-      let clearedRows = 0;
-      const sweptStage = newStage.reduce((ack, row) => {
-        if (row.findIndex(cell => cell[0] === 0) === -1) {
-          clearedRows += 1;
-          ack.unshift(new Array(newStage[0].length).fill([0, 'clear']));
-          return ack;
-        }
-        ack.push(row);
-        return ack;
-      }, [] as Stage);
-      
-      if (clearedRows > 0) {
-        setRows(prev => prev + clearedRows);
-        setScore(prev => prev + (clearedRows * 10 * (level + 1))); // Score logic
-        if (clearedRows >= 4) tetrisAudio.playTetris();
-        else tetrisAudio.playLineClear();
-      }
-      return sweptStage;
-    };
-
-    const updateStage = (prevStage: Stage) => {
-      // First flush the stage from the previous render
-      const newStage = prevStage.map(row =>
-        row.map(cell => (cell[1] === 'clear' ? [0, 'clear'] : cell))
-      ) as Stage;
-
-      // Draw tetromino
-      player.tetromino.forEach((row, y) => {
-        row.forEach((value, x) => {
-          if (value !== 0) {
-            if (
-              newStage[y + player.pos.y] &&
-              newStage[y + player.pos.y][x + player.pos.x]
-            ) {
-              newStage[y + player.pos.y][x + player.pos.x] = [
-                value,
-                `${player.collided ? 'merged' : 'clear'}`,
-              ];
-            }
-          }
-        });
-      });
-
-      // Collision handled
-      if (player.collided) {
-        // Reset player
-        setPlayer({
-          pos: { x: STAGE_WIDTH / 2 - 2, y: 0 },
-          tetromino: nextPiece.shape,
-          collided: false,
-        });
-        setNextPiece(randomTetromino());
-        return sweepRows(newStage);
-      }
-
-      return newStage;
-    };
-
-    setStage(prev => updateStage(prev));
-  }, [player, nextPiece, level]); // Depend on player state
 
   return {
     stage,

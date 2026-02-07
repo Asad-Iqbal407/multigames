@@ -83,6 +83,11 @@ export const usePong = (canvasWidth: number, canvasHeight: number) => {
     stateRef.current.playerY = Math.max(0, Math.min(canvasHeight - PADDLE_HEIGHT, stateRef.current.playerY + dy));
   }, [canvasHeight]);
 
+  const setPlayerY = useCallback((pointerY: number) => {
+    const nextY = pointerY - PADDLE_HEIGHT / 2;
+    stateRef.current.playerY = Math.max(0, Math.min(canvasHeight - PADDLE_HEIGHT, nextY));
+  }, [canvasHeight]);
+
   // Handle Keyboard
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -191,6 +196,7 @@ export const usePong = (canvasWidth: number, canvasHeight: number) => {
     gameState,
     isGameActive,
     isGameOver,
-    startGame
+    startGame,
+    setPlayerY
   };
 };

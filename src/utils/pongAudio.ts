@@ -9,11 +9,16 @@ class PongAudioSynthesizer {
   constructor() {
     if (typeof window === 'undefined') return;
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const g = globalThis as unknown as {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const AudioContextClass = g.AudioContext || g.webkitAudioContext;
       if (AudioContextClass) {
-        this.ctx = new AudioContextClass();
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.connect(this.ctx.destination);
+        const ctx = new AudioContextClass();
+        this.ctx = ctx;
+        this.masterGain = ctx.createGain();
+        this.masterGain.connect(ctx.destination);
         this.masterGain.gain.value = 0.3; // Default volume
       }
     } catch (e) {

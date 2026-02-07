@@ -9,12 +9,43 @@ const CANVAS_HEIGHT = 500;
 
 const PongGame = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isPointerDownRef = useRef(false);
   const {
     gameState,
     isGameActive,
     isGameOver,
-    startGame
+    startGame,
+    setPlayerY
   } = usePong(CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  const setPlayerFromPointerEvent = (e: React.PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const y = (e.clientY - rect.top) * (CANVAS_HEIGHT / rect.height);
+    setPlayerY(y);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (!isGameActive) {
+      startGame();
+      return;
+    }
+    isPointerDownRef.current = true;
+    setPlayerFromPointerEvent(e);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isGameActive) return;
+    if (!isPointerDownRef.current) return;
+    setPlayerFromPointerEvent(e);
+  };
+
+  const handlePointerUp = () => {
+    isPointerDownRef.current = false;
+  };
 
   // Render Game
   useEffect(() => {
@@ -84,7 +115,12 @@ const PongGame = () => {
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          className="bg-black block"
+          className="bg-black block w-[min(92vw,800px)] h-auto"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          style={{ touchAction: 'none' }}
         />
 
         {/* Start Screen */}
@@ -102,6 +138,7 @@ const PongGame = () => {
             <div className="mt-12 grid grid-cols-2 gap-8 text-zinc-500 font-press-start text-[10px]">
               <div className="text-center">
                 <p className="text-cyan-400 mb-2">PLAYER</p>
+                <p>DRAG</p>
                 <p>W / S</p>
                 <p>OR ARROWS</p>
               </div>
@@ -146,7 +183,7 @@ const PongGame = () => {
       </div>
 
       <div className="mt-8 text-zinc-600 text-[10px] font-press-start tracking-tighter">
-        CONTROL YOUR PADDLE WITH W/S OR UP/DOWN ARROWS
+        DRAG ON THE SCREEN OR USE W/S OR ARROWS
       </div>
     </div>
   );

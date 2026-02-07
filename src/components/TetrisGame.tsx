@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { useTetris, STAGE_WIDTH, STAGE_HEIGHT } from "../hooks/useTetris";
 import { TETROMINOES } from "../utils/tetrominoes";
 import { tetrisAudio } from "../utils/tetrisAudio";
@@ -11,6 +11,8 @@ const BLOCK_SIZE = 30;
 const TetrisGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextPieceCanvasRef = useRef<HTMLCanvasElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchConsumedRef = useRef(false);
   const {
     stage,
     player,
@@ -26,6 +28,74 @@ const TetrisGame: React.FC = () => {
     keyUp,
     setIsPaused
   } = useTetris();
+
+  function drawBlock(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    type: string,
+    size = BLOCK_SIZE,
+    offsetX = 0,
+    offsetY = 0
+  ) {
+    const tetromino = Object.values(TETROMINOES).find(t =>
+      t.shape.some(row => row.includes(type))
+    ) || TETROMINOES[type as keyof typeof TETROMINOES];
+
+    const color = tetromino ? `rgb(${tetromino.color})` : '#555';
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = color;
+    ctx.fillStyle = color;
+    ctx.fillRect(x * size + offsetX, y * size + offsetY, size, size);
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(x * size + offsetX, y * size + offsetY, size, size / 2);
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.strokeRect(x * size + offsetX, y * size + offsetY, size, size);
+  }
+
+  const sendMove = (keyCode: number, key?: string) => {
+    move({ keyCode, key, preventDefault: () => {} } as unknown as KeyboardEvent);
+  };
+
+  const handleTouchStart = (e: React.PointerEvent) => {
+    if (!isGameActive || gameOver) return;
+    touchStartRef.current = { x: e.clientX, y: e.clientY };
+    touchConsumedRef.current = false;
+  };
+
+  const handleTouchMove = (e: React.PointerEvent) => {
+    if (!isGameActive || gameOver || isPaused) return;
+    const start = touchStartRef.current;
+    if (!start) return;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const threshold = 18;
+
+    if (absX < threshold && absY < threshold) return;
+    if (touchConsumedRef.current) return;
+
+    touchConsumedRef.current = true;
+    touchStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (absX > absY) {
+      sendMove(dx > 0 ? 39 : 37);
+    } else {
+      if (dy > 0) sendMove(40);
+      else sendMove(38);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartRef.current = null;
+    touchConsumedRef.current = false;
+  };
 
   // Focus handling for keyboard inputs
   useEffect(() => {
@@ -112,37 +182,6 @@ const TetrisGame: React.FC = () => {
     }
   }, [nextPiece, isGameActive]);
 
-  const drawBlock = (
-    ctx: CanvasRenderingContext2D, 
-    x: number, 
-    y: number, 
-    type: string, 
-    size = BLOCK_SIZE,
-    offsetX = 0,
-    offsetY = 0
-  ) => {
-    const tetromino = Object.values(TETROMINOES).find(t => 
-      t.shape.some(row => row.includes(type))
-    ) || TETROMINOES[type as keyof typeof TETROMINOES];
-    
-    const color = tetromino ? `rgb(${tetromino.color})` : '#555';
-    
-    // Glow effect
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = color;
-    ctx.fillStyle = color;
-    ctx.fillRect(x * size + offsetX, y * size + offsetY, size, size);
-    
-    // Bevel/Inner Highlight
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.fillRect(x * size + offsetX, y * size + offsetY, size, size / 2);
-    
-    // Border
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.strokeRect(x * size + offsetX, y * size + offsetY, size, size);
-  };
-
   return (
     <div className="flex flex-col md:flex-row items-center justify-center gap-8 min-h-screen p-8 bg-black font-orbitron text-white">
       {/* Game Container */}
@@ -153,8 +192,58 @@ const TetrisGame: React.FC = () => {
               ref={canvasRef}
               width={STAGE_WIDTH * BLOCK_SIZE}
               height={STAGE_HEIGHT * BLOCK_SIZE}
-              className="bg-black/90 border border-zinc-800 rounded-sm shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]"
+              className="bg-black/90 border border-zinc-800 rounded-sm shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] block w-[min(92vw,360px)] h-auto"
+              onPointerDown={handleTouchStart}
+              onPointerMove={handleTouchMove}
+              onPointerUp={handleTouchEnd}
+              onPointerCancel={handleTouchEnd}
+              style={{ touchAction: 'none' }}
             />
+
+            {isGameActive && (
+              <div className="md:hidden mt-4 flex items-center justify-between gap-3">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => sendMove(37)}
+                    className="w-14 h-14 bg-zinc-900 border border-purple-500/40 text-purple-300 font-press-start text-[10px] active:scale-95"
+                  >
+                    LEFT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendMove(38)}
+                    className="w-14 h-14 bg-zinc-900 border border-purple-500/40 text-purple-300 font-press-start text-[10px] active:scale-95"
+                  >
+                    ROT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendMove(39)}
+                    className="w-14 h-14 bg-zinc-900 border border-purple-500/40 text-purple-300 font-press-start text-[10px] active:scale-95"
+                  >
+                    RIGHT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sendMove(40);
+                      keyUp({ keyCode: 40 });
+                    }}
+                    className="w-14 h-14 bg-zinc-900 border border-purple-500/40 text-purple-300 font-press-start text-[10px] active:scale-95"
+                  >
+                    DOWN
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPaused(prev => !prev)}
+                  className="w-16 h-14 bg-zinc-900 border border-yellow-500/40 text-yellow-300 font-press-start text-[10px] active:scale-95"
+                >
+                  PAUSE
+                </button>
+              </div>
+            )}
             
             {/* Overlay for Game Over / Start */}
             {!isGameActive && (
@@ -171,6 +260,9 @@ const TetrisGame: React.FC = () => {
                 >
                   {gameOver ? 'TRY AGAIN' : 'START GAME'}
                 </button>
+                <div className="mt-6 text-zinc-500 text-[10px] font-press-start text-center">
+                  TAP ROTATE • SWIPE MOVE/DROP
+                </div>
                 <Link href="/" className="mt-4 text-zinc-400 hover:text-white text-xs font-press-start hover:underline">
                   EXIT TO MENU
                 </Link>

@@ -21,6 +21,15 @@ const FlappyBirdGame = () => {
     jump
   } = useFlappyBird(CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (isGameActive) {
+      jump();
+      return;
+    }
+    startGame();
+  };
+
   // Handle keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -149,7 +158,9 @@ const FlappyBirdGame = () => {
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          className="bg-black block"
+          className="bg-black block w-[min(92vw,800px)] h-auto"
+          onPointerDown={handlePointerDown}
+          style={{ touchAction: 'none' }}
         />
 
         {/* Start Screen */}
@@ -159,7 +170,7 @@ const FlappyBirdGame = () => {
               FLAPPY BIRD
             </h1>
             <div className="flex flex-col items-center gap-4 animate-pulse">
-              <p className="text-white font-press-start text-sm">PRESS SPACE TO JUMP</p>
+              <p className="text-white font-press-start text-sm">TAP OR PRESS SPACE TO JUMP</p>
               <button 
                 onClick={startGame}
                 className="mt-8 px-8 py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded shadow-[0_0_20px_rgba(234,179,8,0.5)] transition-all hover:scale-105 active:scale-95 font-press-start text-sm"
@@ -197,7 +208,7 @@ const FlappyBirdGame = () => {
       </div>
 
       <div className="mt-6 text-zinc-500 text-xs font-press-start text-center">
-        [SPACE] or [UP ARROW] to Jump
+        TAP to Jump • [SPACE] or [UP ARROW]
       </div>
     </div>
   );

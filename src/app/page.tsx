@@ -120,8 +120,8 @@ export default function Home() {
 
         </div>
 
-        <div className="text-zinc-600 text-xs font-mono mt-12">
-          Use Keyboard Arrows to Play • Press P to Pause
+        <div className="text-zinc-600 text-xs font-mono mt-12 text-center">
+          Play with Keyboard or Touch • Press P to Pause (Tetris)
         </div>
       </div>
     </main>

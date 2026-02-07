@@ -23,6 +23,8 @@ const FOOD_PER_STAGE = 10;
 
 const SnakeGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeConsumedRef = useRef(false);
   const { 
     isMuted, 
     toggleMute, 
@@ -41,7 +43,12 @@ const SnakeGame: React.FC = () => {
   const [direction, setDirection] = useState<Point>({ x: 1, y: 0 });
   const [nextDirection, setNextDirection] = useState<Point>({ x: 1, y: 0 });
   const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
+  const [highScore, setHighScore] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const saved = localStorage.getItem("snake-highscore");
+    const parsed = saved ? parseInt(saved, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
   const [foodInStage, setFoodInStage] = useState(0);
   const [stage, setStage] = useState(1);
   const [gameOver, setGameOver] = useState(false);
@@ -54,19 +61,10 @@ const SnakeGame: React.FC = () => {
   const requestRef = useRef<number>(null);
   const frameCountRef = useRef(0);
 
-  // Load High Score
   useEffect(() => {
-    const saved = localStorage.getItem("snake-highscore");
-    if (saved) setHighScore(parseInt(saved));
-  }, []);
-
-  // Update High Score
-  useEffect(() => {
-    if (score > highScore) {
-      setHighScore(score);
-      localStorage.setItem("snake-highscore", score.toString());
-    }
-  }, [score, highScore]);
+    if (typeof window === "undefined") return;
+    localStorage.setItem("snake-highscore", highScore.toString());
+  }, [highScore]);
 
   // Handle BGM
   useEffect(() => {
@@ -184,7 +182,11 @@ const SnakeGame: React.FC = () => {
     if (didEatFood) {
       createParticles(food.x, food.y, "#4caf50", 20); // Green particles for food
       playEat();
-      setScore((s) => s + 10);
+      setScore((s) => {
+        const next = s + 10;
+        setHighScore((h) => (next > h ? next : h));
+        return next;
+      });
       setShake(5); // Small shake on eat
       
       const nextFoodInStage = foodInStage + 1;
@@ -226,6 +228,51 @@ const SnakeGame: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [direction]);
+
+  const applyDirection = useCallback((next: Point) => {
+    if (next.x !== 0) {
+      if (direction.x === 0) setNextDirection(next);
+      return;
+    }
+    if (next.y !== 0) {
+      if (direction.y === 0) setNextDirection(next);
+    }
+  }, [direction]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (!gameStarted || gameOver || stageComplete) return;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+    swipeConsumedRef.current = false;
+  }, [gameOver, gameStarted, stageComplete]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!gameStarted || gameOver || stageComplete) return;
+    const start = swipeStartRef.current;
+    if (!start) return;
+
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const threshold = 18;
+
+    if (absX < threshold && absY < threshold) return;
+    if (swipeConsumedRef.current) return;
+
+    swipeConsumedRef.current = true;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (absX > absY) {
+      applyDirection(dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+    } else {
+      applyDirection(dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+    }
+  }, [applyDirection, gameOver, gameStarted, stageComplete]);
+
+  const handlePointerUp = useCallback(() => {
+    swipeStartRef.current = null;
+    swipeConsumedRef.current = false;
+  }, []);
 
   useEffect(() => {
     if (gameStarted && !gameOver) {
@@ -447,9 +494,14 @@ const SnakeGame: React.FC = () => {
             ref={canvasRef}
             width={CANVAS_SIZE}
             height={CANVAS_SIZE}
-            className="block max-w-full"
+            className="block max-w-full w-[min(92vw,400px)] h-auto"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             style={{
               imageRendering: 'pixelated',
+              touchAction: 'none',
               filter: `blur(${shake > 0 ? 1 : 0}px)`
             }}
           />
@@ -503,6 +555,46 @@ const SnakeGame: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="w-full max-w-[420px] md:hidden flex items-center justify-between gap-4 mt-2">
+        <div className="grid grid-cols-3 gap-2">
+          <div />
+          <button
+            onClick={() => applyDirection({ x: 0, y: -1 })}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            type="button"
+          >
+            UP
+          </button>
+          <div />
+          <button
+            onClick={() => applyDirection({ x: -1, y: 0 })}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            type="button"
+          >
+            LEFT
+          </button>
+          <button
+            onClick={() => applyDirection({ x: 0, y: 1 })}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            type="button"
+          >
+            DOWN
+          </button>
+          <button
+            onClick={() => applyDirection({ x: 1, y: 0 })}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            type="button"
+          >
+            RIGHT
+          </button>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 text-zinc-500 text-[10px] font-press-start">
+          <span>SWIPE OR TAP</span>
+          <span>BUTTONS</span>
         </div>
       </div>
 
