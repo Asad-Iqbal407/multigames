@@ -26,3 +26,27 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    text-shadow: 0 0 10px rgba(34,211,238,0.8), 0 0 20px rgba(34,211,238,0.5), 0 0 40px rgba(34,211,238,0.3);
+    opacity: 1;
+  }
+  20%, 22%, 24%, 55% {
+    text-shadow: none;
+    opacity: 0.8;
+  }
+}
+
+.animate-twinkle {
+  animation: twinkle linear infinite;
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 4s infinite;
+}
