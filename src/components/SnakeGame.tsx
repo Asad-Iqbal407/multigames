@@ -25,6 +25,8 @@ const SnakeGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeConsumedRef = useRef(false);
+  const pointerDownMetaRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const swipeThresholdRef = useRef(18);
   const { 
     isMuted, 
     toggleMute, 
@@ -239,22 +241,29 @@ const SnakeGame: React.FC = () => {
     }
   }, [direction]);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!gameStarted || gameOver || stageComplete) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    swipeThresholdRef.current = Math.max(14, Math.min(rect.width, rect.height) * 0.06);
     swipeStartRef.current = { x: e.clientX, y: e.clientY };
     swipeConsumedRef.current = false;
+    pointerDownMetaRef.current = { x: e.clientX, y: e.clientY, t: performance.now() };
   }, [gameOver, gameStarted, stageComplete]);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!gameStarted || gameOver || stageComplete) return;
     const start = swipeStartRef.current;
     if (!start) return;
 
+    e.preventDefault();
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
-    const threshold = 18;
+    const threshold = swipeThresholdRef.current;
 
     if (absX < threshold && absY < threshold) return;
     if (swipeConsumedRef.current) return;
@@ -269,9 +278,53 @@ const SnakeGame: React.FC = () => {
     }
   }, [applyDirection, gameOver, gameStarted, stageComplete]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!gameStarted || gameOver || stageComplete) {
+      swipeStartRef.current = null;
+      swipeConsumedRef.current = false;
+      pointerDownMetaRef.current = null;
+      return;
+    }
+
+    e.preventDefault();
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    const meta = pointerDownMetaRef.current;
+    if (meta && !swipeConsumedRef.current) {
+      const dt = performance.now() - meta.t;
+      const dx = e.clientX - meta.x;
+      const dy = e.clientY - meta.y;
+      const moved = Math.hypot(dx, dy);
+
+      if (dt <= 450 && moved <= Math.max(10, swipeThresholdRef.current * 0.6)) {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const ox = e.clientX - cx;
+          const oy = e.clientY - cy;
+          if (Math.abs(ox) > Math.abs(oy)) {
+            applyDirection(ox > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+          } else {
+            applyDirection(oy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+          }
+        }
+      }
+    }
+
     swipeStartRef.current = null;
     swipeConsumedRef.current = false;
+    pointerDownMetaRef.current = null;
+  }, [applyDirection, gameOver, gameStarted, stageComplete]);
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    swipeStartRef.current = null;
+    swipeConsumedRef.current = false;
+    pointerDownMetaRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -498,7 +551,7 @@ const SnakeGame: React.FC = () => {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
             style={{
               imageRendering: 'pixelated',
               touchAction: 'none',
@@ -562,30 +615,42 @@ const SnakeGame: React.FC = () => {
         <div className="grid grid-cols-3 gap-2">
           <div />
           <button
-            onClick={() => applyDirection({ x: 0, y: -1 })}
-            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              applyDirection({ x: 0, y: -1 });
+            }}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95 touch-none"
             type="button"
           >
             UP
           </button>
           <div />
           <button
-            onClick={() => applyDirection({ x: -1, y: 0 })}
-            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              applyDirection({ x: -1, y: 0 });
+            }}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95 touch-none"
             type="button"
           >
             LEFT
           </button>
           <button
-            onClick={() => applyDirection({ x: 0, y: 1 })}
-            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              applyDirection({ x: 0, y: 1 });
+            }}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95 touch-none"
             type="button"
           >
             DOWN
           </button>
           <button
-            onClick={() => applyDirection({ x: 1, y: 0 })}
-            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              applyDirection({ x: 1, y: 0 });
+            }}
+            className="w-14 h-14 bg-zinc-900 border border-cyan-500/40 text-cyan-300 font-press-start text-[10px] shadow-[0_0_15px_rgba(0,229,255,0.15)] active:scale-95 touch-none"
             type="button"
           >
             RIGHT

@@ -146,7 +146,6 @@ const LEVELS = [
 export const useSuperBino = () => {
   const [gameState, setGameState] = useState<GameState>('start');
   const [score, setScore] = useState(0);
-  const [cameraX, setCameraX] = useState(0);
   const [stage, setStage] = useState(0);
   
   // Refs for game loop state to avoid re-renders
@@ -169,9 +168,15 @@ export const useSuperBino = () => {
   const keysRef = useRef<{ [key: string]: boolean }>({});
   const levelWidthRef = useRef(0);
   const lastFireTimeRef = useRef(0);
+  const cameraXRef = useRef(0);
+
+  const resetInputs = useCallback(() => {
+    keysRef.current = {};
+  }, []);
 
   // --- Initialization ---
   const initGame = useCallback((levelIndex: number = 0) => {
+    resetInputs();
     const newEntities: Entity[] = [];
     const levelData = LEVELS[levelIndex] || LEVELS[0];
 
@@ -223,10 +228,10 @@ export const useSuperBino = () => {
     particlesRef.current = [];
     projectilesRef.current = [];
     setScore(prev => levelIndex === 0 ? 0 : prev); // Reset score only on first level
-    setCameraX(0);
+    cameraXRef.current = 0;
     setStage(levelIndex);
     setGameState('playing');
-  }, []);
+  }, [resetInputs]);
 
   // --- Physics Helpers ---
   const checkCollision = (rect1: {x: number, y: number, width: number, height: number}, rect2: {x: number, y: number, width: number, height: number}) => {
@@ -465,16 +470,44 @@ export const useSuperBino = () => {
     const maxCamX = levelWidthRef.current - 800;
     const clampedCamX = Math.max(0, Math.min(targetCamX, maxCamX));
     // Smooth camera
-    setCameraX(prev => prev + (clampedCamX - prev) * 0.1);
+    cameraXRef.current = cameraXRef.current + (clampedCamX - cameraXRef.current) * 0.1;
 
   }, [gameState, stage, initGame, fireProjectile]);
 
   // --- Input Handlers ---
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === ' ' ||
+      e.key === 'a' ||
+      e.key === 'd' ||
+      e.key === 'w' ||
+      e.key === 'f' ||
+      e.key === 'F'
+    ) {
+      e.preventDefault();
+    }
     keysRef.current[e.key] = true;
   }, []);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    if (
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === ' ' ||
+      e.key === 'a' ||
+      e.key === 'd' ||
+      e.key === 'w' ||
+      e.key === 'f' ||
+      e.key === 'F'
+    ) {
+      e.preventDefault();
+    }
     keysRef.current[e.key] = false;
   }, []);
 
@@ -503,7 +536,7 @@ export const useSuperBino = () => {
   return {
     gameState,
     score,
-    cameraX,
+    cameraXRef,
     stage,
     playerRef,
     entitiesRef,
@@ -513,6 +546,7 @@ export const useSuperBino = () => {
     update,
     handleKeyDown,
     handleKeyUp,
+    resetInputs,
     controls: { jump, moveLeft, moveRight, fire }
   };
 };

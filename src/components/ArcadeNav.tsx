@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -16,14 +16,10 @@ const games = [
 ];
 
 const ArcadeNav: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === '/';
-
-  // Close nav when clicking outside or on a link
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
+  const [navState, setNavState] = useState<{ open: boolean; path: string }>({ open: false, path: '' });
+  const isOpen = navState.open && navState.path === pathname;
 
   if (isHome) return null; // Don't show nav on home page (it already has the grid)
 
@@ -31,7 +27,13 @@ const ArcadeNav: React.FC = () => {
     <div className="fixed left-4 top-1/2 -translate-y-1/2 z-[100] group font-sans">
       {/* Toggle Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setNavState(prev => {
+            const currentlyOpen = prev.open && prev.path === pathname;
+            if (currentlyOpen) return { ...prev, open: false };
+            return { open: true, path: pathname };
+          });
+        }}
         className={`w-12 h-12 rounded-full bg-zinc-900/80 backdrop-blur-xl border transition-all duration-300 flex items-center justify-center text-xl shadow-2xl ${
           isOpen 
             ? 'border-white/40 text-white rotate-90' 
@@ -49,6 +51,7 @@ const ArcadeNav: React.FC = () => {
           <div className="mb-4 pb-4 border-b border-white/5">
             <Link 
               href="/"
+              onClick={() => setNavState(prev => ({ ...prev, open: false }))}
               className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors group/home"
             >
               <span className="text-xl">🏠</span>
@@ -61,6 +64,7 @@ const ArcadeNav: React.FC = () => {
               <Link
                 key={game.href}
                 href={game.href}
+                onClick={() => setNavState(prev => ({ ...prev, open: false }))}
                 className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-300 group/link ${
                   pathname === game.href ? 'bg-white/10' : 'hover:bg-white/5'
                 }`}

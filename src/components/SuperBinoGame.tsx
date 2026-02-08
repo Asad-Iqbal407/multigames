@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { useSuperBino } from '../hooks/useSuperBino';
 
 const SuperBinoGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const {
     gameState,
     score,
-    cameraX,
+    cameraXRef,
     stage,
     playerRef,
     entitiesRef,
@@ -19,6 +19,7 @@ const SuperBinoGame: React.FC = () => {
     update,
     handleKeyDown,
     handleKeyUp,
+    resetInputs,
     controls
   } = useSuperBino();
 
@@ -26,8 +27,9 @@ const SuperBinoGame: React.FC = () => {
   const draw = React.useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = ctxRef.current ?? canvas.getContext('2d');
     if (!ctx) return;
+    ctxRef.current = ctx;
 
     // Clear Screen
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -49,7 +51,7 @@ const SuperBinoGame: React.FC = () => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    ctx.translate(-cameraX, 0);
+    ctx.translate(-cameraXRef.current, 0);
 
     // Draw Entities
     entitiesRef.current.forEach(ent => {
@@ -140,7 +142,7 @@ const SuperBinoGame: React.FC = () => {
     ctx.fillStyle = '#fff';
     ctx.fillText(`SCORE: ${score}`, 20, 40);
     ctx.fillText(`STAGE: ${stage + 1}`, 20, 70);
-  }, [cameraX, score, stage, entitiesRef, particlesRef, projectilesRef, playerRef]);
+  }, [cameraXRef, score, stage, entitiesRef, particlesRef, projectilesRef, playerRef]);
 
   // --- Game Loop ---
   useEffect(() => {
@@ -166,6 +168,19 @@ const SuperBinoGame: React.FC = () => {
     };
   }, [handleKeyDown, handleKeyUp]);
 
+  useEffect(() => {
+    const onBlur = () => resetInputs();
+    const onVisibility = () => {
+      if (document.hidden) resetInputs();
+    };
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [resetInputs]);
+
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 overflow-hidden relative font-sans">
       
@@ -182,7 +197,7 @@ const SuperBinoGame: React.FC = () => {
           ref={canvasRef}
           width={800}
           height={600}
-          className="block max-w-full h-auto"
+          className="block max-w-full h-auto touch-none"
           style={{ imageRendering: 'pixelated' }}
         />
 
@@ -233,25 +248,61 @@ const SuperBinoGame: React.FC = () => {
         <div className="flex gap-2">
           <button 
             className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center text-white text-2xl active:bg-white/30 backdrop-blur-sm border border-white/10"
-            onTouchStart={(e) => { e.preventDefault(); controls.moveLeft(true); }}
-            onTouchEnd={(e) => { e.preventDefault(); controls.moveLeft(false); }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              controls.moveLeft(true);
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              controls.moveLeft(false);
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }
+            }}
+            onPointerCancel={(e) => {
+              e.preventDefault();
+              controls.moveLeft(false);
+            }}
+            onLostPointerCapture={() => controls.moveLeft(false)}
           >←</button>
           <button 
             className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center text-white text-2xl active:bg-white/30 backdrop-blur-sm border border-white/10"
-            onTouchStart={(e) => { e.preventDefault(); controls.moveRight(true); }}
-            onTouchEnd={(e) => { e.preventDefault(); controls.moveRight(false); }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              controls.moveRight(true);
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              controls.moveRight(false);
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }
+            }}
+            onPointerCancel={(e) => {
+              e.preventDefault();
+              controls.moveRight(false);
+            }}
+            onLostPointerCapture={() => controls.moveRight(false)}
           >→</button>
         </div>
         <div className="flex gap-4">
           <button 
             className="w-16 h-16 bg-red-500/80 rounded-full flex items-center justify-center text-white font-bold text-lg active:bg-red-400 shadow-lg backdrop-blur-sm border border-white/10"
-            onTouchStart={(e) => { e.preventDefault(); controls.fire(); }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              controls.fire();
+            }}
           >
             FIRE
           </button>
           <button 
             className="w-16 h-16 bg-blue-600/80 rounded-full flex items-center justify-center text-white font-bold text-lg active:bg-blue-500 shadow-lg backdrop-blur-sm border border-white/10"
-            onTouchStart={(e) => { e.preventDefault(); controls.jump(); }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              controls.jump();
+            }}
           >
             JUMP
           </button>
