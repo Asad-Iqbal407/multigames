@@ -116,6 +116,16 @@ export default function Home() {
             isNew={true}
           />
 
+          <GameCard 
+            href="/superman-dino"
+            title="Superman vs Dino"
+            category="Action"
+            description="Fly, fire, and survive against a brutal fire-breathing titan."
+            icon="🦖"
+            accent="cyan"
+            isNew={true}
+          />
+
           {/* Bubble Shooter Card */}
           <GameCard 
             href="/bubble-shooter"
