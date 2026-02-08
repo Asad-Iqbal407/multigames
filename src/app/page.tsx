@@ -138,6 +138,16 @@ export default function Home() {
             isNew={true}
           />
 
+          <GameCard 
+            href="/archer"
+            title="Duck Hunt"
+            category="Action"
+            description="Track fast flying ducks and advance stages with perfect shots."
+            icon="🏹"
+            accent="amber"
+            isNew={true}
+          />
+
         </div>
 
         {/* Features Section - Modern Minimalist */}

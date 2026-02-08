@@ -13,6 +13,7 @@ const games = [
   { name: 'STAR WAR', href: '/star-war', icon: '🚀', color: 'text-rose-400' },
   { name: 'BUBBLES', href: '/bubble-shooter', icon: '🫧', color: 'text-sky-400' },
   { name: 'SUPER BINO', href: '/super-bino', icon: '🍄', color: 'text-indigo-400' },
+  { name: 'DUCK HUNT', href: '/archer', icon: '🏹', color: 'text-amber-400' },
 ];
 
 const ArcadeNav: React.FC = () => {
